@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+import Footer from '@/components/Footer';
+
+import Header from '@/components/Header';
+
 interface Game {
   id: string;
   user_character: string;
@@ -78,59 +82,61 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Game History</h1>
-          <button
-            onClick={() => router.push('/game')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Back to Game
-          </button>
-        </header>
+    <div className="min-h-screen flex flex-col">
+      <Header title="Game History" />
 
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          {games.length === 0 ? (
-            <div className="text-center text-gray-500 py-12">
-              <p className="text-lg">No games played yet.</p>
-              <p className="text-sm mt-2">Start a game to see your history here!</p>
+      <div className="flex-1 flex flex-col items-center mt-6 px-4 pb-6">
+        <div className="w-full max-w-6xl">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => router.push('/game')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Back to Game
+              </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {games.map((game) => (
-                <div
-                  key={game.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => viewGameDetails(game)}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                          game.winner === 'user'
-                            ? 'bg-green-100 text-green-800'
-                            : game.winner === 'llm'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {game.winner === 'user' ? '🎉 Won' : game.winner === 'llm' ? '😔 Lost' : 'Incomplete'}
-                        </span>
-                        <span className="text-sm text-gray-600">{game.model_name}</span>
+            {games.length === 0 ? (
+              <div className="text-center text-gray-500 py-12">
+                <p className="text-lg">No games played yet.</p>
+                <p className="text-sm mt-2">Start a game to see your history here!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {games.map((game) => (
+                  <div
+                    key={game.id}
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => viewGameDetails(game)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            game.winner === 'user'
+                              ? 'bg-green-100 text-green-800'
+                              : game.winner === 'llm'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {game.winner === 'user' ? '🎉 Won' : game.winner === 'llm' ? '😔 Lost' : 'Incomplete'}
+                          </span>
+                          <span className="text-sm text-gray-600">{game.model_name}</span>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <p>Your Character: <span className="font-semibold">{game.user_character}</span></p>
+                          <p>LLM&apos;s Character: <span className="font-semibold">{game.llm_character}</span></p>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        <p>Your Character: <span className="font-semibold">{game.user_character}</span></p>
-                        <p>LLM&apos;s Character: <span className="font-semibold">{game.llm_character}</span></p>
+                      <div className="text-sm text-gray-500">
+                        {new Date(game.created_at).toLocaleDateString()}
                       </div>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(game.created_at).toLocaleDateString()}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Game Details Modal */}
@@ -225,6 +231,7 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }
