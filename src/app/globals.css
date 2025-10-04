@@ -1,0 +1,293 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: #333;
+}
+
+/* Character Cards */
+.character-card {
+  width: 85px;
+  height: 113px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  background: white;
+  border: 2px solid transparent;
+}
+
+.character-card:hover {
+  z-index: 1000;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.character-card.eliminated {
+  opacity: 0.3;
+  filter: grayscale(100%);
+  transform: scale(0.9);
+}
+
+.character-card.selected {
+  border: 3px solid #4caf50;
+  box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4);
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(129, 199, 132, 0.1) 100%);
+}
+
+.character-card.selected::after {
+  content: '★';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: #4caf50;
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.character-card.hidden::before {
+  content: '?';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border-radius: inherit;
+}
+
+.character-card.hidden img {
+  visibility: hidden;
+}
+
+.character-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Character name label */
+.character-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(102, 126, 234, 0.9);
+  color: white;
+  text-align: center;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 5;
+}
+
+/* Messages */
+.message {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  max-width: 80%;
+  word-wrap: break-word;
+  animation: slideUp 0.3s ease;
+  line-height: 1.4;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-message {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  align-self: flex-end;
+  margin-left: auto;
+  border-bottom-right-radius: 8px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.assistant-message {
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  align-self: flex-start;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom-left-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.system-message {
+  background: rgba(255, 193, 7, 0.1);
+  color: #f57c00;
+  align-self: center;
+  text-align: center;
+  font-style: italic;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+/* Typing indicator */
+.typing-indicator {
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  align-self: flex-start;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom-left-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  max-width: 80%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #667eea;
+  animation: typingAnimation 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingAnimation {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  animation: slideIn 0.3s ease;
+  overflow-y: auto;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Elimination notifications */
+.elimination-notice {
+  background: rgba(244, 67, 54, 0.1);
+  border-left: 4px solid #f44336;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+  color: #c62828;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.elimination-notice::before {
+  content: '🚫';
+}
+
+/* Tab buttons */
+.tab-button {
+  flex: 1;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  background: transparent;
+  color: #666;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.tab-button:hover {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  transform: translateY(-1px);
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transform: translateY(-2px);
+}
