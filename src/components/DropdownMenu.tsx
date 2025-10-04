@@ -39,7 +39,7 @@ export default function DropdownMenu() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center w-10 h-10 bg-purple-100 rounded-full text-white hover:bg-indigo-100 transition-colors"
+        className="flex items-center justify-center w-10 h-10 rounded-full text-white"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
@@ -50,22 +50,10 @@ export default function DropdownMenu() {
         <div className="absolute right-0 mt-2 w-25 bg-purple-100 rounded-md shadow-lg z-50">
           <div className="py-1">
             <button
-              onClick={() => router.push('/game')}
-              className="block w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-indigo-100"
-            >
-              Game
-            </button>
-            <button
               onClick={() => router.push('/settings')}
               className="block w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-indigo-100"
             >
               Settings
-            </button>
-            <button
-              onClick={() => router.push('/history')}
-              className="block w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-indigo-100"
-            >
-              History
             </button>
             <button
               onClick={() => router.push('/help')}

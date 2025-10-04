@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="text-white text-center py-4">
       <p className="text-sm my-3">
             Made by 
-            <img src="https://zansara.dev/me/avatar.svg" className="inline-block h-5 w-5 mx-1"/> 
+            <img src="/zansara.svg" className="inline-block h-5 w-5 mx-1"/> 
             <a href="https://zansara.dev" target="_blank">Sara Zan </a> 
             with the help of
             <a href="https://www.anthropic.com/claude-code" className="inline-block h-5 w-5 mx-1" target="_blank">🤖</a>

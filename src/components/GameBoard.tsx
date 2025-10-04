@@ -7,7 +7,6 @@ interface GameBoardProps {
   selectedCharacter?: Character | null;
   eliminatedCharacters: Set<Character>;
   onCharacterClick?: (character: Character) => void;
-  title: string;
   showSelectedName?: boolean;
 }
 
@@ -15,7 +14,6 @@ export default function GameBoard({
   selectedCharacter,
   eliminatedCharacters,
   onCharacterClick,
-  title,
   showSelectedName = true,
 }: GameBoardProps) {
   return (

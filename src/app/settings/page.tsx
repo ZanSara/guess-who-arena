@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 import Footer from '@/components/Footer';
-
 import Header from '@/components/Header';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import HistorySection from '@/components/HistorySection';
 
 interface CustomPrompt {
   id: string;
@@ -25,8 +26,9 @@ export default function SettingsPage() {
   // Settings
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
-  const [model, setModel] = useState('gpt-4o');
+  const [model, setModel] = useState('gpt-5-mini');
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [revealLlmCharacter, setRevealLlmCharacter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -40,12 +42,14 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (!loading) {
       loadSettings();
-      loadCustomPrompts();
+      if (user) {
+        loadCustomPrompts();
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [loading, user]);
 
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -78,10 +82,12 @@ export default function SettingsPage() {
       const storedBaseUrl = localStorage.getItem('openai_base_url');
       const storedModel = localStorage.getItem('openai_model');
       const storedPrompt = localStorage.getItem('system_prompt');
+      const storedRevealLlmCharacter = localStorage.getItem('reveal_llm_character');
 
       if (storedApiKey) setApiKey(storedApiKey);
       if (storedBaseUrl) setBaseUrl(storedBaseUrl);
       if (storedModel) setModel(storedModel);
+      if (storedRevealLlmCharacter) setRevealLlmCharacter(storedRevealLlmCharacter === 'true');
       if (storedPrompt) {
         setSystemPrompt(storedPrompt);
         return; // Don't load default if we have a stored one
@@ -143,6 +149,7 @@ export default function SettingsPage() {
         localStorage.setItem('openai_base_url', baseUrl);
         localStorage.setItem('openai_model', model);
         localStorage.setItem('system_prompt', systemPrompt);
+        localStorage.setItem('reveal_llm_character', revealLlmCharacter.toString());
       }
 
       setMessage('Settings saved successfully!');
@@ -246,28 +253,21 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header title="Settings" />
+      <Header/>
 
       <div className="flex-1 flex flex-col items-center mt-6 px-4 pb-6">
         <div className="w-full max-w-4xl">
           <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => router.push('/history')}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-              >
-                History
-              </button>
-              <button
-                onClick={() => router.push('/game')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Back to Game
-              </button>
-            </div>
-            {/* API Key Section */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4">OpenAI Configuration</h2>
+            <h1 className="text-3xl text-center font-bold mb-4">Settings</h1>
+
+            {/* Info for anonymous users */}
+            {!isAuthenticated && (
+              <div className="p-4 bg-blue-50 rounded-md text-sm text-blue-800">
+                💡 <strong>Tip:</strong> Sign in to save custom prompts and access your game history.
+              </div>
+            )}
+
+            <CollapsibleSection title="LLM">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -316,12 +316,23 @@ export default function SettingsPage() {
                     Custom API endpoint URL. Leave empty to use the default OpenAI endpoint.
                   </p>
                 </div>
-              </div>
-            </div>
 
-            {/* System Prompt Section */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4">System Prompt</h2>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-md">
+                  <input
+                    type="checkbox"
+                    id="reveal-llm-character"
+                    checked={revealLlmCharacter}
+                    onChange={(e) => setRevealLlmCharacter(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="reveal-llm-character" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Reveal LLM&apos;s character during gameplay
+                  </label>
+                </div>
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="System Prompt">
               <div className="space-y-4">
                 <div className="flex gap-2">
                   <button
@@ -346,85 +357,73 @@ export default function SettingsPage() {
                   placeholder="Enter your system prompt here..."
                 />
               </div>
-            </div>
 
-            {/* Save Current Prompt - Only for authenticated users */}
-            {isAuthenticated && (
-              <>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Save Current Prompt</h3>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newPromptName}
-                      onChange={(e) => setNewPromptName(e.target.value)}
-                      placeholder="Prompt name..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={saveCustomPrompt}
-                      className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                    >
-                      Save Prompt
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom Prompts List */}
-                {customPrompts.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Your Custom Prompts</h3>
-                    <div className="space-y-2">
-                      {customPrompts.map((prompt) => (
-                        <div
-                          key={prompt.id}
-                          className="flex justify-between items-center p-3 bg-gray-50 rounded-md"
-                        >
-                          <div>
-                            <p className="font-medium">{prompt.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {prompt.model_name || 'No model specified'}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => loadPrompt(prompt.id)}
-                              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                            >
-                              Load
-                            </button>
-                            <button
-                              onClick={() => deletePrompt(prompt.id)}
-                              className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+              {/* Save Current Prompt - Only for authenticated users */}
+              {isAuthenticated && (
+                <>
+                  <div className="pt-4 border-t">
+                    <h3 className="text-lg font-semibold mb-2">Save Current Prompt</h3>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newPromptName}
+                        onChange={(e) => setNewPromptName(e.target.value)}
+                        placeholder="Prompt name..."
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={saveCustomPrompt}
+                        className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        Save Prompt
+                      </button>
                     </div>
                   </div>
-                )}
-              </>
-            )}
 
-            {/* Info for anonymous users */}
-            {!isAuthenticated && (
-              <div className="p-4 bg-blue-50 rounded-md text-sm text-blue-800">
-                💡 <strong>Tip:</strong> Sign in to save custom prompts and access game history across devices.
-              </div>
-            )}
+                  {/* Custom Prompts List */}
+                  {customPrompts.length > 0 && (
+                    <div className="pt-4">
+                      <h3 className="text-lg font-semibold mb-2">Your Custom Prompts</h3>
+                      <div className="space-y-2">
+                        {customPrompts.map((prompt) => (
+                          <div
+                            key={prompt.id}
+                            className="flex justify-between items-center p-3 bg-gray-50 rounded-md"
+                          >
+                            <div>
+                              <p className="font-medium">{prompt.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {prompt.model_name || 'No model specified'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => loadPrompt(prompt.id)}
+                                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                              >
+                                Load
+                              </button>
+                              <button
+                                onClick={() => deletePrompt(prompt.id)}
+                                className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </CollapsibleSection>
 
-            {/* Save Button */}
-            <div className="pt-4 border-t">
-              <button
-                onClick={saveSettings}
-                disabled={saving}
-                className="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save Settings'}
-              </button>
-            </div>
+            {isAuthenticated && (
+              <CollapsibleSection title="Past Games">
+                <HistorySection />
+              </CollapsibleSection>
+            )}
 
             {message && (
               <div
@@ -437,6 +436,25 @@ export default function SettingsPage() {
                 {message}
               </div>
             )}
+
+            {/* Save Button */}
+            <div className="pt-4 text-center">
+              <button
+                onClick={saveSettings}
+                disabled={saving}
+                className="mx-5 px-6 py-3 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save Settings'}
+              </button>
+
+              <a href="/"
+                className="mx-5 px-6 py-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Back to Game
+              </a>
+
+            </div>
+
           </div>
         </div>
       </div>

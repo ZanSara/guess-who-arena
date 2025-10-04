@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import ChatMessage from './ChatMessage';
 
 export interface Message {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool-call';
   content: string;
+  toolName?: string;
 }
 
 interface ChatInterfaceProps {
@@ -13,6 +14,7 @@ interface ChatInterfaceProps {
   onSendMessage: (message: string) => void;
   isProcessing: boolean;
   disabled?: boolean;
+  onNewGame?: () => void;
 }
 
 export default function ChatInterface({
@@ -20,6 +22,7 @@ export default function ChatInterface({
   onSendMessage,
   isProcessing,
   disabled = false,
+  onNewGame,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,7 +51,7 @@ export default function ChatInterface({
         ref={messagesContainerRef}
       >
         {messages.map((msg, idx) => (
-          <ChatMessage key={idx} role={msg.role} content={msg.content} />
+          <ChatMessage key={idx} role={msg.role} content={msg.content} toolName={msg.toolName} />
         ))}
         {isProcessing && (
           <div className="typing-indicator">
@@ -67,7 +70,7 @@ export default function ChatInterface({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={disabled ? 'Game not started...' : 'Type your message...'}
+          placeholder={disabled ? 'Game ended - Start a new game!' : 'Type your message...'}
           disabled={disabled || isProcessing}
           className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-full outline-none focus:border-indigo-500 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
         />
@@ -78,6 +81,15 @@ export default function ChatInterface({
         >
           Send
         </button>
+        {onNewGame && (
+          <button
+            type="button"
+            onClick={onNewGame}
+            className="px-6 py-3 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-full font-semibold shadow-md hover:from-green-600 hover:to-green-700 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            New Game
+          </button>
+        )}
       </form>
     </div>
   );
