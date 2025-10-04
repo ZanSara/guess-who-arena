@@ -17,7 +17,7 @@ export default function CharacterCard({
   isEliminated,
   isSelected = false,
   onClick,
-  showName = true,
+  showName = false,
   isHidden = false,
 }: CharacterCardProps) {
   const cardClasses = [
@@ -36,9 +36,6 @@ export default function CharacterCard({
         height={113}
         className="w-full h-full object-cover"
       />
-      {showName && !isHidden && (
-        <div className="character-name">{character}</div>
-      )}
     </div>
   );
 }

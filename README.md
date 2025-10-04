@@ -115,4 +115,4 @@ MIT
 
 ## Credits
 
-Based on the original [Guess Who LLM game](https://www.zansara.dev/guess-who/) by [Sara Zanzottera](https://zansara.dev).
+Based on the original [Guess Who LLM game](https://www.zansara.dev/guess-who/) by [zansara](https://zansara.dev).
