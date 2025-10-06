@@ -64,15 +64,16 @@ export default function SettingsPage() {
 
   async function loadSettings() {
     if (user) {
-      // Load from Supabase for authenticated users
+      // Check if API key exists for authenticated users (but don't load the actual key)
       const { data: apiKeyData } = await supabase
         .from('api_keys')
-        .select('api_key, base_url')
+        .select('base_url')
         .eq('user_id', user.id)
         .single();
 
-      if (apiKeyData && apiKeyData.api_key) {
-        setApiKey(apiKeyData.api_key);
+      if (apiKeyData) {
+        // Show placeholder to indicate key is configured
+        setApiKey('••••••••••••••••••••'); // Masked placeholder
         if (apiKeyData.base_url) setBaseUrl(apiKeyData.base_url);
       }
 
@@ -132,43 +133,19 @@ export default function SettingsPage() {
 
     try {
       if (isAuthenticated && user) {
-        // Save to Supabase for authenticated users
-        // First, check if a record exists
-        const { data: existing } = await supabase
-          .from('api_keys')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
+        // Save encrypted API key via server-side endpoint
+        const response = await fetch('/api/keys/set', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: apiKey,
+            baseUrl: baseUrl || null
+          })
+        });
 
-        if (existing) {
-          // Update existing record
-          const { error } = await supabase
-            .from('api_keys')
-            .update({
-              api_key: apiKey,
-              base_url: baseUrl || null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id);
-
-          if (error) {
-            console.error('Supabase error:', error);
-            throw error;
-          }
-        } else {
-          // Insert new record
-          const { error } = await supabase
-            .from('api_keys')
-            .insert({
-              user_id: user.id,
-              api_key: apiKey,
-              base_url: baseUrl || null
-            });
-
-          if (error) {
-            console.error('Supabase error:', error);
-            throw error;
-          }
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to save API key');
         }
 
         // Clear localStorage for logged-in users (they should only use DB)
@@ -187,6 +164,9 @@ export default function SettingsPage() {
       }
 
       setMessage('Settings saved successfully!');
+
+      // Clear API key field after successful save
+      setApiKey('');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setMessage('Error saving settings: ' + message);
@@ -354,9 +334,8 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <input
                       type="password"
-                      value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk-..."
+                      placeholder={(apiKey && "API key is set! Paste a new one here to overwrite it.") || "..."}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <button
@@ -368,9 +347,16 @@ export default function SettingsPage() {
                       Delete Key
                     </button>
                   </div>
+                  {!isAuthenticated && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Check the Help page to learn how this key is handled and make sure you're ok with it.
+                    ⚠️ This key will be saved in localStorage. Don't forget to clear it once you're done playing!
                   </p>
+                  )}
+                  {isAuthenticated && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    This key will be encrypted and stored in our backend database. Clicking "Delete Key" will delete it from our database as well.
+                  </p>
+                  )}
                 </div>
 
                 <div>

@@ -88,16 +88,17 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
   async function loadSettings() {
     if (user) {
-      // Load from Supabase for authenticated users
+      // For authenticated users, just check if API key exists
+      // (API key is loaded and decrypted server-side in /api/chat)
       const { data } = await supabase
         .from('api_keys')
-        .select('api_key, base_url')
+        .select('id, base_url')
         .eq('user_id', user.id)
         .single();
 
-      if (data && data.api_key) {
-        setApiKey(data.api_key);
-        apiKeyRef.current = data.api_key;
+      if (data) {
+        setApiKey('configured'); // Flag indicating key exists
+        apiKeyRef.current = 'configured';
         if (data.base_url) {
           setBaseUrl(data.base_url);
           baseUrlRef.current = data.base_url;
@@ -324,8 +325,11 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         body: JSON.stringify({
           messages: conversationHistory.current,
           model,
-          apiKey: apiKeyRef.current,
-          baseUrl: baseUrlRef.current
+          // For anonymous users, send API key in request
+          ...((!user && apiKeyRef.current) && {
+            apiKey: apiKeyRef.current,
+            baseUrl: baseUrlRef.current
+          })
         })
       });
 

@@ -41,7 +41,7 @@ npm install
 ### 3. Set up Supabase
 
 1. Create a new project at [supabase.com](https://supabase.com)
-2. Copy your project URL and anon key
+2. Copy your project URL and publishable key
 3. Run the SQL schema in your Supabase SQL editor:
 
 ```bash
@@ -54,7 +54,13 @@ Create a `.env.local` file:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+USER_APIKEY_ENCRYPTION_KEY=your-32-byte-base64-encryption-key
+```
+
+Generate the encryption key with:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
 ### 5. Run the development server

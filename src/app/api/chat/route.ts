@@ -1,15 +1,49 @@
 import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { TOOLS } from '@/lib/constants';
+import { createClient } from '@/lib/supabase/server';
+import { decryptApiKey, EncryptedData } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, model, apiKey, baseUrl } = await request.json();
+    const { messages, model, apiKey: clientApiKey, baseUrl: clientBaseUrl } = await request.json();
 
-    if (!apiKey) {
-      return new Response('API key is required', { status: 400 });
+    let apiKey: string;
+    let baseUrl: string | undefined;
+
+    // Check if user is authenticated
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      // Authenticated user - load encrypted API key from database
+      const { data: keyData, error: keyError } = await supabase
+        .from('api_keys')
+        .select('key_encrypted, base_url')
+        .eq('user_id', user.id)
+        .single();
+
+      if (keyError || !keyData) {
+        return new Response('API key not configured. Please set your API key in settings.', { status: 400 });
+      }
+
+      // Decrypt API key server-side
+      try {
+        apiKey = decryptApiKey(keyData.key_encrypted as EncryptedData);
+        baseUrl = keyData.base_url || undefined;
+      } catch (error) {
+        console.error('Failed to decrypt API key:', error);
+        return new Response('Failed to decrypt API key', { status: 500 });
+      }
+    } else {
+      // Anonymous user - use API key from request body
+      if (!clientApiKey) {
+        return new Response('API key is required', { status: 400 });
+      }
+      apiKey = clientApiKey;
+      baseUrl = clientBaseUrl;
     }
-    
+
     const openai = new OpenAI({
       apiKey: apiKey,
       ...(baseUrl && { baseURL: baseUrl }),

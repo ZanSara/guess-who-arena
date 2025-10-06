@@ -13,7 +13,8 @@ export default function HelpPage() {
         <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg p-6 space-y-6">
           <h2 className="text-2xl font-bold">🕵️ Let's Play "Guess Who" with an LLM!</h2>
           <p>
-              With this little game you can try to play "Guess Who" against an LLM of your choice.
+              With this little game you can try to play "Guess Who" against an LLM of your choice,
+              create your own LLM player and have different LLMs compete with each other.
           </p>
           <h2 className="text-2xl font-bold">The Rules</h2>
           <p>
@@ -25,9 +26,9 @@ export default function HelpPage() {
               <li>Your goal is to guess which character the other player has received by asking yes/no questions, such as "Is your character male?" or "Does your character have black hair?" and so on</li>
               <li>The first player to guess the opponent character's name wins.</li>
           </ul>
-          <h2 className="text-2xl font-bold">Choose the LLM</h2>
+          <h2 className="text-2xl font-bold">Connect to your LLM provider</h2>
           <p>
-              Before you can play you have to <b>connect an LLM</b>. This game supports OpenAI-compatible endpoints. Just click on Settings, type in the model name of the LLM you want to play against and add your API key. If you're not using OpenAI models, you should also add the endpoint of your provider.
+              Before you can play you have to <b>connect an LLM provider</b>. This game supports OpenAI-compatible endpoints. Just click on Settings, type in the model name of the LLM you want to play against and add your API key. If you're not using OpenAI models, you should also add the endpoint of your provider.
           </p>
 
           <details className="space-y-2">

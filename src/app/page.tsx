@@ -39,14 +39,15 @@ export default function Home() {
 
   async function loadSettings() {
     if (user) {
+      // Just check if API key exists (don't load the actual key)
       const { data } = await supabase
         .from('api_keys')
-        .select('api_key')
+        .select('id')
         .eq('user_id', user.id)
         .single();
 
       if (data) {
-        setApiKey(data.api_key);
+        setApiKey('configured'); // Just a flag to indicate key exists
       }
 
       // Clear localStorage for logged-in users (they should only use DB)
