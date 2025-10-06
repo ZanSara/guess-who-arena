@@ -69,20 +69,26 @@ export default function SettingsPage() {
         .from('api_keys')
         .select('api_key, base_url')
         .eq('user_id', user.id)
-        .eq('provider', 'openai')
         .single();
 
-      if (apiKeyData) {
+      if (apiKeyData && apiKeyData.api_key) {
         setApiKey(apiKeyData.api_key);
         if (apiKeyData.base_url) setBaseUrl(apiKeyData.base_url);
       }
+
+      // Clear localStorage for logged-in users (they should only use DB)
+      localStorage.removeItem('guesswhoarena_api_key');
+      localStorage.removeItem('guesswhoarena_base_url');
+      localStorage.removeItem('guesswhoarena_model');
+      localStorage.removeItem('guesswhoarena_system_prompt');
+      localStorage.removeItem('guesswhoarena_reveal_llm_character');
     } else {
       // Load from localStorage for anonymous users
-      const storedApiKey = localStorage.getItem('openai_api_key');
-      const storedBaseUrl = localStorage.getItem('openai_base_url');
-      const storedModel = localStorage.getItem('openai_model');
-      const storedPrompt = localStorage.getItem('system_prompt');
-      const storedRevealLlmCharacter = localStorage.getItem('reveal_llm_character');
+      const storedApiKey = localStorage.getItem('guesswhoarena_api_key');
+      const storedBaseUrl = localStorage.getItem('guesswhoarena_base_url');
+      const storedModel = localStorage.getItem('guesswhoarena_model');
+      const storedPrompt = localStorage.getItem('guesswhoarena_system_prompt');
+      const storedRevealLlmCharacter = localStorage.getItem('guesswhoarena_reveal_llm_character');
 
       if (storedApiKey) setApiKey(storedApiKey);
       if (storedBaseUrl) setBaseUrl(storedBaseUrl);
@@ -127,29 +133,57 @@ export default function SettingsPage() {
     try {
       if (isAuthenticated && user) {
         // Save to Supabase for authenticated users
-        const { error } = await supabase
+        // First, check if a record exists
+        const { data: existing } = await supabase
           .from('api_keys')
-          .upsert({
-            user_id: user.id,
-            provider: 'openai',
-            api_key: apiKey,
-            base_url: baseUrl || null,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id,provider'
-          });
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
 
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
+        if (existing) {
+          // Update existing record
+          const { error } = await supabase
+            .from('api_keys')
+            .update({
+              api_key: apiKey,
+              base_url: baseUrl || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
+        } else {
+          // Insert new record
+          const { error } = await supabase
+            .from('api_keys')
+            .insert({
+              user_id: user.id,
+              api_key: apiKey,
+              base_url: baseUrl || null
+            });
+
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
         }
+
+        // Clear localStorage for logged-in users (they should only use DB)
+        localStorage.removeItem('guesswhoarena_api_key');
+        localStorage.removeItem('guesswhoarena_base_url');
+        localStorage.removeItem('guesswhoarena_model');
+        localStorage.removeItem('guesswhoarena_system_prompt');
+        localStorage.removeItem('guesswhoarena_reveal_llm_character');
       } else {
         // Save to localStorage for anonymous users
-        localStorage.setItem('openai_api_key', apiKey);
-        localStorage.setItem('openai_base_url', baseUrl);
-        localStorage.setItem('openai_model', model);
-        localStorage.setItem('system_prompt', systemPrompt);
-        localStorage.setItem('reveal_llm_character', revealLlmCharacter.toString());
+        localStorage.setItem('guesswhoarena_api_key', apiKey);
+        localStorage.setItem('guesswhoarena_base_url', baseUrl);
+        localStorage.setItem('guesswhoarena_model', model);
+        localStorage.setItem('guesswhoarena_system_prompt', systemPrompt);
+        localStorage.setItem('guesswhoarena_reveal_llm_character', revealLlmCharacter.toString());
       }
 
       setMessage('Settings saved successfully!');
@@ -216,6 +250,34 @@ export default function SettingsPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setMessage('Error deleting prompt: ' + message);
+    }
+  }
+
+  async function clearApiKey() {
+    if (!confirm('Are you sure you want to clear your API key?')) return;
+
+    try {
+      if (isAuthenticated && user) {
+        // Delete from database for authenticated users
+        const { error } = await supabase
+          .from('api_keys')
+          .delete()
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      }
+
+      // Clear from localStorage (for both authenticated and anonymous users)
+      localStorage.removeItem('guesswhoarena_api_key');
+      localStorage.removeItem('guesswhoarena_base_url');
+
+      // Clear state
+      setApiKey('');
+      setBaseUrl('');
+      setMessage('API key cleared successfully!');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setMessage('Error clearing API key: ' + message);
     }
   }
 
@@ -289,15 +351,25 @@ export default function SettingsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     API Key
                   </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk-..."
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={clearApiKey}
+                      disabled={!apiKey}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+                      title="Clear API key"
+                    >
+                      Delete Key
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Your API key is stored securely and never shared.
+                    Check the Help page to learn how this key is handled and make sure you're ok with it.
                   </p>
                 </div>
 
@@ -313,7 +385,7 @@ export default function SettingsPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Custom API endpoint URL. Leave empty to use the default OpenAI endpoint.
+                    Tip: leave empty to use the default OpenAI endpoint.
                   </p>
                 </div>
 

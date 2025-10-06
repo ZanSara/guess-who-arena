@@ -56,7 +56,7 @@ export default function HistorySection() {
   }
 
   function viewGameDetails(game: Game) {
-    window.open(`/game?id=${game.id}`, '_blank');
+    window.open(`/game/${game.id}`, '_blank');
   }
 
   if (loading) {

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Guess Who Arena - Play Against LLMs",
-  description: "Play Guess Who against Large Language Models",
+  title: "Guess Who Arena",
+  description: "Play Guess Who against Large Language Models - by Sara Zan",
 };
 
 export default function RootLayout({

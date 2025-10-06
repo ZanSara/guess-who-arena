@@ -1,5 +1,5 @@
--- Users table (extends Supabase auth.users)
--- Supabase Auth handles users table automatically
+-- Complete initial schema for Guess Who Arena
+-- Includes all tables, indexes, and RLS policies
 
 -- Custom prompts table
 CREATE TABLE IF NOT EXISTS custom_prompts (
@@ -12,10 +12,10 @@ CREATE TABLE IF NOT EXISTS custom_prompts (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Games table
+-- Games table (with user_id nullable for anonymous games)
 CREATE TABLE IF NOT EXISTS games (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- Nullable for anonymous games
   user_character VARCHAR(50) NOT NULL,
   llm_character VARCHAR(50) NOT NULL,
   model_name VARCHAR(100) NOT NULL,
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS games (
   user_eliminated JSONB, -- Array of eliminated character names
   llm_eliminated JSONB, -- Array of eliminated character names
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   completed_at TIMESTAMP WITH TIME ZONE
 );
 
@@ -31,12 +32,11 @@ CREATE TABLE IF NOT EXISTS games (
 CREATE TABLE IF NOT EXISTS api_keys (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  provider VARCHAR(50) NOT NULL, -- 'openai'
   api_key TEXT NOT NULL, -- Should be encrypted at application level
   base_url TEXT, -- Custom API endpoint URL (optional)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, provider)
+  UNIQUE(user_id)
 );
 
 -- Indexes for better query performance
@@ -64,14 +64,19 @@ CREATE POLICY "Users can delete their own prompts" ON custom_prompts
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Games policies
-CREATE POLICY "Users can view their own games" ON games
-  FOR SELECT USING (auth.uid() = user_id);
+-- Allow public read access for game sharing
+CREATE POLICY "Enable read access for all users" ON games
+  FOR SELECT USING (true);
 
-CREATE POLICY "Users can insert their own games" ON games
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Allow both authenticated and anonymous users to create games
+CREATE POLICY "Users can insert their own games or anonymous games" ON games
+  FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 
-CREATE POLICY "Users can update their own games" ON games
-  FOR UPDATE USING (auth.uid() = user_id);
+-- Allow users to update their own games, and allow anonymous game updates
+CREATE POLICY "Users can update their own games or anonymous games" ON games
+  FOR UPDATE
+  USING (auth.uid() = user_id OR user_id IS NULL)
+  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 
 -- API Keys policies
 CREATE POLICY "Users can view their own API keys" ON api_keys

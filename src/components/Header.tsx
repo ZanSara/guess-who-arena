@@ -24,9 +24,9 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white/10 backdrop-blur-md text-white py-4 px-6 flex justify-between items-center border-b border-white/20">
+    <header className="text-white py-4 px-6 flex justify-between items-center border-b border-white/20">
       <a href="https://zansara.dev" target="_blank"> <img src="/zansara.svg" className="inline-block h-10 w-10 mx-1"/></a>
-      <h1 className="text-3xl text-center font-semibold" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)' }}>
+      <h1 className="absolute left-1/2 -translate-x-1/2 text-3xl font-semibold text-center" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)' }}>
         <Link href="/">Guess Who Arena</Link>
       </h1>
       <div className="flex items-center gap-2">
