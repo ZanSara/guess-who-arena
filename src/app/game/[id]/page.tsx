@@ -185,45 +185,28 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
       // Convert conversation to messages for display
       const displayMessages: Message[] = [];
-      console.log('Loading game conversation:', game.conversation?.length, 'messages');
 
       if (game.conversation) {
         for (let i = 0; i < game.conversation.length; i++) {
           const msg = game.conversation[i];
-          console.log(`Message ${i}:`, {
-            role: msg.role,
-            hasContent: !!msg.content,
-            contentType: typeof msg.content,
-            hasToolCalls: !!msg.tool_calls,
-            toolCallsCount: msg.tool_calls?.length,
-            actualToolCalls: msg.tool_calls
-          });
 
           // Skip system messages and messages with images
           if (msg.role === 'system') {
-            console.log('  -> Skipping: system message');
             continue;
           }
           // Skip messages with image arrays (but allow null content for tool calls)
           if (msg.content !== null && typeof msg.content === 'object') {
-            console.log('  -> Skipping: object content (images)');
             continue;
           }
           if (msg.role === 'tool') {
-            console.log('  -> Skipping: tool response message');
             continue;
           }
 
           // Handle assistant messages with tool calls
           const hasToolCalls = msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0;
-          console.log(`  -> Is assistant with tool calls? ${hasToolCalls}`);
-
           if (hasToolCalls) {
-            console.log(`  -> Processing ${msg.tool_calls.length} tool calls`);
-
             // Add assistant message if there's content
             if (msg.content) {
-              console.log('  -> Adding assistant message with content');
               displayMessages.push({
                 role: 'assistant',
                 content: msg.content as string
@@ -233,7 +216,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
             // Add tool call messages
             for (const toolCall of msg.tool_calls) {
               const functionName = toolCall.function.name;
-              console.log('  -> Processing tool call:', functionName, 'args:', toolCall.function.arguments);
 
               try {
                 const args = JSON.parse(toolCall.function.arguments);
@@ -245,7 +227,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                   toolCallContent = `winner=${args.winner}`;
                 }
 
-                console.log('  -> Adding tool-call display message:', toolCallContent);
                 displayMessages.push({
                   role: 'tool-call',
                   content: toolCallContent,
@@ -257,18 +238,15 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
             }
           } else if (msg.role === 'user' || msg.role === 'assistant') {
             // Regular user or assistant message
-            console.log(`  -> Adding regular ${msg.role} message`);
             displayMessages.push({
               role: msg.role as 'user' | 'assistant',
               content: msg.content as string
             });
           } else {
-            console.log('  -> Message not processed (unknown type)');
           }
         }
       }
 
-      console.log('Total display messages created:', displayMessages.length);
       setMessages(displayMessages);
       setActiveTab('chat');
 
@@ -302,8 +280,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     const llmEliminatedArray = Array.from(llmElim ?? llmEliminated);
     const winnerValue = winner !== undefined ? winner : gameWinner;
 
-    console.log('Updating game in DB:', currentGameId, 'Conversation length:', conversationHistory.current.length);
-
     try {
       const { data, error } = await supabase
         .from('games')
@@ -319,8 +295,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
       if (error) {
         console.error('Failed to update game - Supabase error:', error);
-      } else {
-        console.log('Game updated successfully:', data);
       }
     } catch (error) {
       console.error('Failed to update game - Exception:', error);
@@ -343,8 +317,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
   async function sendToLLM() {
     setIsProcessing(true);
-    console.log("API Key (state):", apiKey);
-    console.log("API Key (ref):", apiKeyRef.current);
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -418,17 +390,9 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
         ...(toolCalls.length > 0 && { tool_calls: toolCalls })
       };
 
-      console.log('Adding assistant message to history:', {
-        hasContent: !!assistantMsg.content,
-        hasToolCalls: !!(assistantMsg as any).tool_calls,
-        toolCallsCount: (assistantMsg as any).tool_calls?.length,
-        toolCalls: (assistantMsg as any).tool_calls
-      });
-
       conversationHistory.current.push(assistantMsg);
 
       // Update game in database
-      console.log('Saving conversation to DB, length:', conversationHistory.current.length);
       await updateGameInDB();
 
       // Handle tool calls
@@ -448,8 +412,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   }
 
   async function handleToolCalls(toolCalls: { id: string; type: 'function'; function: { name: string; arguments: string } }[]) {
-    console.log('handleToolCalls called with', toolCalls.length, 'tool calls');
-
     let updatedLlmEliminated = llmEliminated;
     let updatedWinner: 'user' | 'llm' | 'tie' | null = gameWinner;
     let isGameEnding = false;
@@ -457,7 +419,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     for (const toolCall of toolCalls) {
       const functionName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
-      console.log('Processing tool call:', functionName, args);
 
       if (functionName === 'eliminateCharacter') {
         const charName = args.characterName;
@@ -511,9 +472,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
         // Update game in database with final state
         if (currentGameId) {
-          console.log('Saving endGame - conversation length:', conversationHistory.current.length);
-          console.log('Last 3 conversation messages:', conversationHistory.current.slice(-3));
-
           await supabase
             .from('games')
             .update({
@@ -531,7 +489,6 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
     // Update game in database after tool calls (except if game just ended, already updated above)
     if (!isGameEnding) {
-      console.log('Saving after tool calls - conversation length:', conversationHistory.current.length);
       await updateGameInDB(userEliminated, updatedLlmEliminated, updatedWinner);
     }
 

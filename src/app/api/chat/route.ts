@@ -9,23 +9,7 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       return new Response('API key is required', { status: 400 });
     }
-
-    // Debug: Log the messages being sent
-    console.log('=== SENDING TO OPENAI ===');
-    console.log('Model:', model);
-    console.log('Number of messages:', messages.length);
-    messages.forEach((msg: any, idx: number) => {
-      console.log(`Message ${idx}:`, {
-        role: msg.role,
-        hasContent: !!msg.content,
-        contentType: typeof msg.content,
-        hasToolCalls: !!msg.tool_calls,
-        toolCallsCount: msg.tool_calls?.length,
-        toolCallId: msg.tool_call_id,
-        name: msg.name
-      });
-    });
-
+    
     const openai = new OpenAI({
       apiKey: apiKey,
       ...(baseUrl && { baseURL: baseUrl }),

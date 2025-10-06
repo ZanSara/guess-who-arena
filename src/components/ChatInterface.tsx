@@ -34,7 +34,7 @@ export default function ChatInterface({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isProcessing]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
