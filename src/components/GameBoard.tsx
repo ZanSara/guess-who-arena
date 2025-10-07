@@ -25,10 +25,15 @@ export default function GameBoard({
               character={selectedCharacter}
               isEliminated={false}
               isSelected={true}
-              showName={showSelectedName}
               isHidden={!showSelectedName}
             />
           </div>
+          {showSelectedName && (
+            <div className="text-center">
+              <div className="text-xl font-bold text-gray-800">{selectedCharacter}</div>
+              <div className="text-sm text-gray-600">Your Character</div>
+            </div>
+          )}
         </div>
       )}
 

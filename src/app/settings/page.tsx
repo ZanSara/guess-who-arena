@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import HistorySection from '@/components/HistorySection';
+import AIConfigSelector, { AIConfig } from '@/components/AIConfigSelector';
 
 interface CustomPrompt {
   id: string;
@@ -23,10 +24,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // AI Configurations
+  const [savedConfigs, setSavedConfigs] = useState<AIConfig[]>([]);
+
   // Settings
-  const [apiKey, setApiKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [model, setModel] = useState('gpt-5-mini');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [revealLlmCharacter, setRevealLlmCharacter] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,6 +45,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!loading) {
       loadSettings();
+      loadConfigs();
       if (user) {
         loadCustomPrompts();
       }
@@ -62,43 +64,87 @@ export default function SettingsPage() {
     setLoading(false);
   }
 
+  async function loadConfigs() {
+    try {
+      const response = await fetch('/api/ai-configs/list');
+      if (response.ok) {
+        const data = await response.json();
+        const configs = data.configs.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          modelName: c.model_name,
+          provider: c.provider,
+          baseUrl: c.base_url,
+          isDefault: c.isDefault,
+        }));
+        setSavedConfigs(configs);
+      }
+    } catch (error) {
+      console.error('Error loading configs:', error);
+    }
+  }
+
+  async function handleSaveConfig(config: AIConfig) {
+    try {
+      const response = await fetch('/api/ai-configs/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: config.id && !config.id.startsWith('local-') ? config.id : undefined,
+          name: config.name,
+          modelName: config.modelName,
+          provider: config.provider,
+          apiKey: config.apiKey,
+          baseUrl: config.baseUrl
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save configuration');
+      }
+
+      await loadConfigs();
+      setMessage('AI Player saved successfully!');
+    } catch (error) {
+      console.error('Error saving config:', error);
+      setMessage(`Failed to save AI Player: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
+  }
+
+  async function handleDeleteConfig(id: string) {
+    try {
+      const response = await fetch('/api/ai-configs/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete configuration');
+      }
+
+      await loadConfigs();
+      setMessage('AI Player deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting config:', error);
+      setMessage('Failed to delete AI Player');
+    }
+  }
+
   async function loadSettings() {
-    if (user) {
-      // Check if API key exists for authenticated users (but don't load the actual key)
-      const { data: apiKeyData } = await supabase
-        .from('api_keys')
-        .select('base_url')
-        .eq('user_id', user.id)
-        .single();
+    // Load reveal LLM character preference
+    const storedRevealLlmCharacter = localStorage.getItem('guesswhoarena_reveal_llm_character');
+    if (storedRevealLlmCharacter) {
+      setRevealLlmCharacter(storedRevealLlmCharacter === 'true');
+    }
 
-      if (apiKeyData) {
-        // Show placeholder to indicate key is configured
-        setApiKey('••••••••••••••••••••'); // Masked placeholder
-        if (apiKeyData.base_url) setBaseUrl(apiKeyData.base_url);
-      }
-
-      // Clear localStorage for logged-in users (they should only use DB)
-      localStorage.removeItem('guesswhoarena_api_key');
-      localStorage.removeItem('guesswhoarena_base_url');
-      localStorage.removeItem('guesswhoarena_model');
-      localStorage.removeItem('guesswhoarena_system_prompt');
-      localStorage.removeItem('guesswhoarena_reveal_llm_character');
-    } else {
-      // Load from localStorage for anonymous users
-      const storedApiKey = localStorage.getItem('guesswhoarena_api_key');
-      const storedBaseUrl = localStorage.getItem('guesswhoarena_base_url');
-      const storedModel = localStorage.getItem('guesswhoarena_model');
-      const storedPrompt = localStorage.getItem('guesswhoarena_system_prompt');
-      const storedRevealLlmCharacter = localStorage.getItem('guesswhoarena_reveal_llm_character');
-
-      if (storedApiKey) setApiKey(storedApiKey);
-      if (storedBaseUrl) setBaseUrl(storedBaseUrl);
-      if (storedModel) setModel(storedModel);
-      if (storedRevealLlmCharacter) setRevealLlmCharacter(storedRevealLlmCharacter === 'true');
-      if (storedPrompt) {
-        setSystemPrompt(storedPrompt);
-        return; // Don't load default if we have a stored one
-      }
+    // Load system prompt from localStorage or default
+    const storedPrompt = localStorage.getItem('guesswhoarena_system_prompt');
+    if (storedPrompt) {
+      setSystemPrompt(storedPrompt);
+      return;
     }
 
     // Load default prompt
@@ -132,41 +178,11 @@ export default function SettingsPage() {
     setMessage('');
 
     try {
-      if (isAuthenticated && user) {
-        // Save encrypted API key via server-side endpoint
-        const response = await fetch('/api/keys/set', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            apiKey: apiKey,
-            baseUrl: baseUrl || null
-          })
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to save API key');
-        }
-
-        // Clear localStorage for logged-in users (they should only use DB)
-        localStorage.removeItem('guesswhoarena_api_key');
-        localStorage.removeItem('guesswhoarena_base_url');
-        localStorage.removeItem('guesswhoarena_model');
-        localStorage.removeItem('guesswhoarena_system_prompt');
-        localStorage.removeItem('guesswhoarena_reveal_llm_character');
-      } else {
-        // Save to localStorage for anonymous users
-        localStorage.setItem('guesswhoarena_api_key', apiKey);
-        localStorage.setItem('guesswhoarena_base_url', baseUrl);
-        localStorage.setItem('guesswhoarena_model', model);
-        localStorage.setItem('guesswhoarena_system_prompt', systemPrompt);
-        localStorage.setItem('guesswhoarena_reveal_llm_character', revealLlmCharacter.toString());
-      }
+      // Save to localStorage
+      localStorage.setItem('guesswhoarena_system_prompt', systemPrompt);
+      localStorage.setItem('guesswhoarena_reveal_llm_character', revealLlmCharacter.toString());
 
       setMessage('Settings saved successfully!');
-
-      // Clear API key field after successful save
-      setApiKey('');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setMessage('Error saving settings: ' + message);
@@ -189,8 +205,7 @@ export default function SettingsPage() {
         .insert({
           user_id: user.id,
           name: newPromptName,
-          prompt_text: systemPrompt,
-          model_name: model
+          prompt_text: systemPrompt
         });
 
       if (error) throw error;
@@ -208,9 +223,6 @@ export default function SettingsPage() {
     const prompt = customPrompts.find(p => p.id === promptId);
     if (prompt) {
       setSystemPrompt(prompt.prompt_text);
-      if (prompt.model_name) {
-        setModel(prompt.model_name);
-      }
     }
   }
 
@@ -230,34 +242,6 @@ export default function SettingsPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setMessage('Error deleting prompt: ' + message);
-    }
-  }
-
-  async function clearApiKey() {
-    if (!confirm('Are you sure you want to clear your API key?')) return;
-
-    try {
-      if (isAuthenticated && user) {
-        // Delete from database for authenticated users
-        const { error } = await supabase
-          .from('api_keys')
-          .delete()
-          .eq('user_id', user.id);
-
-        if (error) throw error;
-      }
-
-      // Clear from localStorage (for both authenticated and anonymous users)
-      localStorage.removeItem('guesswhoarena_api_key');
-      localStorage.removeItem('guesswhoarena_base_url');
-
-      // Clear state
-      setApiKey('');
-      setBaseUrl('');
-      setMessage('API key cleared successfully!');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setMessage('Error clearing API key: ' + message);
     }
   }
 
@@ -309,72 +293,21 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <CollapsibleSection title="LLM">
+            <CollapsibleSection title="AI Players">
+              <AIConfigSelector
+                value={null}
+                onChange={() => {}}
+                label="Manage AI Players"
+                isAuthenticated={isAuthenticated}
+                savedConfigs={savedConfigs}
+                onSaveConfig={handleSaveConfig}
+                onDeleteConfig={handleDeleteConfig}
+                mode="manage"
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Game Settings">
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Model Name
-                  </label>
-                  <input
-                    type="text"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    placeholder="gpt-4o, gpt-5, etc."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Examples: gpt-5, gpt-5-mini, gpt-4o
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    API Key
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={(apiKey && "API key is set! Paste a new one here to overwrite it.") || "..."}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={clearApiKey}
-                      disabled={!apiKey}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
-                      title="Clear API key"
-                    >
-                      Delete Key
-                    </button>
-                  </div>
-                  {!isAuthenticated && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    ⚠️ This key will be saved in localStorage. Don't forget to clear it once you're done playing!
-                  </p>
-                  )}
-                  {isAuthenticated && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    This key will be encrypted and stored in our backend database. Clicking "Delete Key" will delete it from our database as well.
-                  </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Base URL (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder="https://api.openai.com/v1"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Tip: leave empty to use the default OpenAI endpoint.
-                  </p>
-                </div>
-
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-md">
                   <input
                     type="checkbox"
@@ -450,9 +383,6 @@ export default function SettingsPage() {
                           >
                             <div>
                               <p className="font-medium">{prompt.name}</p>
-                              <p className="text-xs text-gray-500">
-                                {prompt.model_name || 'No model specified'}
-                              </p>
                             </div>
                             <div className="flex gap-2">
                               <button

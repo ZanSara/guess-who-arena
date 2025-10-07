@@ -177,32 +177,28 @@ export default function Home() {
       <Header />
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-6">
-        <div className="flex flex-col items-center justify-center gap-4">
-          {(!apiKey || apiKey.trim() === '') && (
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center max-w-md">
-              <p className="text-yellow-800 font-semibold mb-2">⚠️ API Key Required</p>
-              <p className="text-yellow-700 text-sm">
-                Please configure your OpenAI API key in settings before starting a game.
-              </p>
-              <button
-                onClick={() => router.push('/settings')}
-                className="mt-3 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-semibold transition-colors"
-              >
-                Go to Settings
-              </button>
-            </div>
-          )}
-          <button
-            onClick={startGame}
-            disabled={!apiKey || apiKey.trim() === ''}
-            className={`px-12 py-4 text-white text-xl font-semibold rounded-full shadow-lg transition-all ${
-              !apiKey || apiKey.trim() === ''
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 hover:-translate-y-1 hover:shadow-xl'
-            }`}
-          >
-            Start Game!
-          </button>
+        <div className="flex flex-col items-center justify-center gap-4 max-w-xl w-full">
+          
+          <div className="text-center">
+            <p className="text-4xl text-white font-bold mb-6">Guess Who Arena</p>
+            <p className="text-sm text-gray-200">Choose your game mode</p>
+          </div>
+
+          <div className="flex flex-col gap-4 w-full">
+            <button
+              onClick={() => router.push('/game/setup/human-vs-ai')}
+              className="w-full px-8 py-4 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-lg font-semibold rounded-lg shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl"
+            >
+              Play Against AI
+            </button>
+
+            <button
+              onClick={() => router.push('/game/setup/ai-vs-ai')}
+              className="w-full px-8 py-4 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-lg font-semibold rounded-lg shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl"
+            >
+              AI vs AI Battle
+            </button>
+          </div>
         </div>
       </div>
 

@@ -41,6 +41,9 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const [gameWinner, setGameWinner] = useState<'user' | 'llm' | 'tie' | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [modelName, setModelName] = useState<string>('');
+  const [gameType, setGameType] = useState<string>('human_vs_ai');
+  const [currentTurn, setCurrentTurn] = useState<'ai1' | 'ai2'>('ai1');
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
 
   // Settings
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -48,6 +51,10 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
   const [model] = useState<string>('gpt-5-mini');
   const [systemPrompt, setSystemPrompt] = useState<string>('');
   const [revealLlmCharacter, setRevealLlmCharacter] = useState(false);
+
+  // AI vs AI specific settings
+  const [ai1Config, setAi1Config] = useState<{ apiKey: string; baseUrl: string; model: string } | null>(null);
+  const [ai2Config, setAi2Config] = useState<{ apiKey: string; baseUrl: string; model: string } | null>(null);
 
   // Image cache and refs for immediate access
   const imageCache = useRef<Map<string, string>>(new Map());
@@ -152,6 +159,67 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
     }
   }
 
+  async function loadAIConfigurations(player1Id: string, player2Id: string) {
+    try {
+      if (user) {
+        // Load from database for authenticated users
+        const { data: configs } = await supabase
+          .from('ai_configurations')
+          .select('id, model_name, key_encrypted, base_url')
+          .in('id', [player1Id, player2Id]);
+
+        if (configs && configs.length === 2) {
+          // Note: We can't decrypt client-side, so we'll pass the IDs to the API
+          // and let the server handle decryption
+          const config1 = configs.find(c => c.id === player1Id);
+          const config2 = configs.find(c => c.id === player2Id);
+
+          if (config1) {
+            setAi1Config({
+              apiKey: config1.id, // Use ID as placeholder - server will decrypt
+              baseUrl: config1.base_url || '',
+              model: config1.model_name
+            });
+          }
+
+          if (config2) {
+            setAi2Config({
+              apiKey: config2.id, // Use ID as placeholder - server will decrypt
+              baseUrl: config2.base_url || '',
+              model: config2.model_name
+            });
+          }
+        }
+      } else {
+        // Load from localStorage for anonymous users
+        const localConfigs = localStorage.getItem('aiConfigs');
+        if (localConfigs) {
+          const configs = JSON.parse(localConfigs);
+          const config1 = configs.find((c: any) => c.id === player1Id);
+          const config2 = configs.find((c: any) => c.id === player2Id);
+
+          if (config1) {
+            setAi1Config({
+              apiKey: config1.apiKey || '',
+              baseUrl: config1.baseUrl || '',
+              model: config1.modelName || 'gpt-4o-mini'
+            });
+          }
+
+          if (config2) {
+            setAi2Config({
+              apiKey: config2.apiKey || '',
+              baseUrl: config2.baseUrl || '',
+              model: config2.modelName || 'gpt-4o-mini'
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading AI configurations:', error);
+    }
+  }
+
   async function loadGame(gameId: string) {
     try {
       // Load game data from Supabase (publicly accessible)
@@ -176,10 +244,16 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       setLlmEliminated(new Set(game.llm_eliminated as Character[]));
       setGameWinner(game.winner);
       setModelName(game.model_name);
+      setGameType(game.game_type || 'human_vs_ai');
 
       // Check if game is completed
       const isCompleted = !!game.completed_at || !!game.winner;
       setGameEnded(isCompleted);
+
+      // Load AI configurations for AI vs AI games
+      if (game.game_type === 'ai_vs_ai' && game.player_1_id && game.player_2_id) {
+        await loadAIConfigurations(game.player_1_id, game.player_2_id);
+      }
 
       // Load conversation history for continuing the game or viewing
       conversationHistory.current = game.conversation || [];
@@ -251,12 +325,16 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       setMessages(displayMessages);
       setActiveTab('chat');
 
-      // Only auto-call LLM if game just started (chat is empty)
-      if (!isCompleted && displayMessages.length === 0 && conversationHistory.current.length > 0) {
+      // Start auto-play for AI vs AI games
+      if (game.game_type === 'ai_vs_ai' && !isCompleted) {
+        if (displayMessages.length === 0 && conversationHistory.current.length > 0) {
+          // Game just started, begin auto-play loop
+          setTimeout(() => startAIvsAIAutoPlay(), 500);
+        }
+      } else if (!isCompleted && displayMessages.length === 0 && conversationHistory.current.length > 0) {
+        // Regular game: auto-call LLM if game just started
         const lastMessage = conversationHistory.current[conversationHistory.current.length - 1];
-        // If last message is from user (initial setup), trigger LLM
         if (lastMessage.role === 'user') {
-          // Use setTimeout to ensure state is set before calling sendToLLM
           setTimeout(() => sendToLLM(), 100);
         }
       }
@@ -313,6 +391,251 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
       return base64;
     }
     return '';
+  }
+
+  async function startAIvsAIAutoPlay() {
+    if (!ai1Config || !ai2Config || gameEnded || isAutoPlaying) {
+      return;
+    }
+
+    setIsAutoPlaying(true);
+    setCurrentTurn('ai1');
+
+    // Start the auto-play loop
+    await playAIvsAITurn();
+  }
+
+  async function playAIvsAITurn() {
+    if (gameEnded || !isAutoPlaying) {
+      return;
+    }
+
+    const aiConfig = currentTurn === 'ai1' ? ai1Config : ai2Config;
+    const aiLabel = currentTurn === 'ai1' ? 'AI 1' : 'AI 2';
+
+    if (!aiConfig) {
+      console.error('AI config not found for', currentTurn);
+      return;
+    }
+
+    // Add a message indicating whose turn it is
+    setMessages(prev => [...prev, {
+      role: 'system',
+      content: `--- ${aiLabel}'s turn ---`
+    }]);
+
+    // Add a small delay for readability
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      // Send AI turn to LLM
+      await sendAITurn(aiConfig, aiLabel);
+
+      // Switch turns and continue if game hasn't ended
+      if (!gameEnded) {
+        setCurrentTurn(prev => prev === 'ai1' ? 'ai2' : 'ai1');
+        // Continue the loop with a delay
+        setTimeout(() => playAIvsAITurn(), 2000);
+      } else {
+        setIsAutoPlaying(false);
+      }
+    } catch (error) {
+      console.error('Error in AI vs AI turn:', error);
+      setIsAutoPlaying(false);
+    }
+  }
+
+  async function sendAITurn(aiConfig: { apiKey: string; baseUrl: string; model: string }, aiLabel: string) {
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: conversationHistory.current,
+          model: aiConfig.model,
+          // For authenticated users, send config ID; for anonymous, send API key
+          ...(user ? {
+            configId: aiConfig.apiKey // This is actually the config ID for authenticated users
+          } : {
+            apiKey: aiConfig.apiKey,
+            baseUrl: aiConfig.baseUrl
+          })
+        })
+      });
+
+      if (!response.ok) throw new Error('Chat request failed');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      let assistantMessage = '';
+      const toolCalls: { id: string; type: 'function'; function: { name: string; arguments: string } }[] = [];
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.type === 'content') {
+                  assistantMessage += data.content;
+                  // Update UI in real-time with AI label
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.toolName) {
+                      newMessages[newMessages.length - 1].content = `${aiLabel}: ${assistantMessage}`;
+                    } else {
+                      newMessages.push({ role: 'assistant', content: `${aiLabel}: ${assistantMessage}` });
+                    }
+                    return newMessages;
+                  });
+                } else if (data.type === 'tool_calls') {
+                  for (const tc of data.tool_calls) {
+                    if (tc.index !== undefined) {
+                      if (!toolCalls[tc.index]) {
+                        toolCalls[tc.index] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+                      }
+                      if (tc.id) toolCalls[tc.index].id = tc.id;
+                      if (tc.function?.name) toolCalls[tc.index].function.name = tc.function.name;
+                      if (tc.function?.arguments) toolCalls[tc.index].function.arguments += tc.function.arguments;
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
+        }
+      }
+
+      // Add assistant message to history (without the label prefix in history)
+      const assistantMsg = {
+        role: 'assistant',
+        content: toolCalls.length > 0 ? (assistantMessage || null) : assistantMessage,
+        ...(toolCalls.length > 0 && { tool_calls: toolCalls })
+      };
+
+      conversationHistory.current.push(assistantMsg);
+
+      // Update game in database
+      await updateGameInDB();
+
+      // Handle tool calls
+      if (toolCalls.length > 0) {
+        await handleAIvsAIToolCalls(toolCalls, currentTurn);
+      }
+
+    } catch (error) {
+      console.error('Error communicating with AI:', error);
+      setMessages(prev => [...prev, {
+        role: 'system',
+        content: `Error: Failed to communicate with ${aiLabel}. Please check configuration.`
+      }]);
+      setIsAutoPlaying(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  async function handleAIvsAIToolCalls(
+    toolCalls: { id: string; type: 'function'; function: { name: string; arguments: string } }[],
+    aiTurn: 'ai1' | 'ai2'
+  ) {
+    const eliminatedSet = aiTurn === 'ai1' ? userEliminated : llmEliminated;
+    const setEliminatedFunc = aiTurn === 'ai1' ? setUserEliminated : setLlmEliminated;
+    let updatedEliminated = eliminatedSet;
+    let updatedWinner: 'user' | 'llm' | 'tie' | null = gameWinner;
+    let isGameEnding = false;
+
+    for (const toolCall of toolCalls) {
+      const functionName = toolCall.function.name;
+      const args = JSON.parse(toolCall.function.arguments);
+
+      if (functionName === 'eliminateCharacter') {
+        const charName = args.characterName;
+        const aiLabel = aiTurn === 'ai1' ? 'AI 1' : 'AI 2';
+
+        setMessages(prev => [...prev, {
+          role: 'tool-call',
+          content: `${aiLabel} eliminated: ${charName}`,
+          toolName: 'eliminateCharacter'
+        }]);
+
+        if (CHARACTERS.includes(charName as Character)) {
+          updatedEliminated = new Set([...updatedEliminated, charName as Character]);
+          setEliminatedFunc(updatedEliminated);
+          conversationHistory.current.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: functionName,
+            content: `Successfully eliminated ${charName} from your board.`
+          });
+        } else {
+          conversationHistory.current.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: functionName,
+            content: `Error: ${charName} is not a valid character name.`
+          });
+        }
+      } else if (functionName === 'endGame') {
+        const winner = args.winner as 'user' | 'llm';
+        updatedWinner = winner;
+        isGameEnding = true;
+        const aiLabel = aiTurn === 'ai1' ? 'AI 1' : 'AI 2';
+
+        setMessages(prev => [...prev, {
+          role: 'tool-call',
+          content: `${aiLabel} ends the game! Winner: ${winner === 'user' ? 'AI 1' : 'AI 2'}`,
+          toolName: 'endGame'
+        }]);
+
+        setGameEnded(true);
+        setGameWinner(winner);
+        setIsAutoPlaying(false);
+
+        conversationHistory.current.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: functionName,
+          content: `Game ended. Winner: ${winner}`
+        });
+
+        // Update game in database with final state
+        if (currentGameId) {
+          await supabase
+            .from('games')
+            .update({
+              conversation: conversationHistory.current,
+              user_eliminated: Array.from(userEliminated),
+              llm_eliminated: Array.from(updatedEliminated),
+              winner: winner,
+              completed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', currentGameId);
+        }
+      }
+    }
+
+    // Update game in database after tool calls (except if game just ended)
+    if (!isGameEnding) {
+      if (aiTurn === 'ai1') {
+        await updateGameInDB(updatedEliminated, llmEliminated, updatedWinner);
+      } else {
+        await updateGameInDB(userEliminated, updatedEliminated, updatedWinner);
+      }
+    }
   }
 
 
@@ -684,7 +1007,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 onClick={() => setActiveTab('user-board')}
                 className={`tab-button ${activeTab === 'user-board' ? 'active' : ''}`}
               >
-                Your Board
+                {gameType === 'ai_vs_ai' ? 'AI 1\'s Board' : 'Your Board'}
               </button>
               <button
                 onClick={() => setActiveTab('chat')}
@@ -696,13 +1019,25 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 onClick={() => setActiveTab('llm-board')}
                 className={`tab-button ${activeTab === 'llm-board' ? 'active' : ''}`}
               >
-                AI&apos;s Board
+                {gameType === 'ai_vs_ai' ? 'AI 2\'s Board' : 'AI\'s Board'}
               </button>
             </div>
 
             <div className="bg-white/95 rounded-xl shadow-lg backdrop-blur-md border border-white/30 p-4">
               {activeTab === 'chat' && (
                 <div>
+                  {gameType === 'ai_vs_ai' && !gameEnded && (
+                    <div className="mb-4 p-4 bg-gradient-to-r from-purple-100/50 to-pink-100/50 rounded-lg border border-purple-200/20 text-center">
+                      <div className="text-lg font-bold mb-2">🤖 AI vs AI Battle</div>
+                      <div className="text-sm text-gray-700">
+                        {isAutoPlaying ? (
+                          <>⚡ Battle in progress! Currently: <span className="font-semibold">{currentTurn === 'ai1' ? 'AI 1' : 'AI 2'}</span>'s turn</>
+                        ) : (
+                          <>Watch two AI opponents compete automatically!</>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {gameEnded ? (
                     <div className="mb-4 p-3 bg-gradient-to-r from-amber-100/50 to-orange-100/50 rounded-lg border border-amber-200/20 text-center text-sm">
                       📽️ <span className="font-bold">Game Completed</span> - {gameWinner === 'user' ? 'You won!' : gameWinner === 'llm' ? `${modelName} won!` : 'No one won.'}
@@ -710,7 +1045,11 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                   ) : (
                     <div className="mb-4 p-3 bg-gradient-to-r from-indigo-100/50 to-purple-100/50 rounded-lg border border-indigo-200/20 text-sm flex items-center justify-between">
                       <div className="flex-1 text-center">
-                        Playing against: <span className="font-bold">{modelName || model}</span>
+                        {gameType === 'ai_vs_ai' ? (
+                          <>AI Battle: <span className="font-bold">AI 1 vs AI 2</span></>
+                        ) : (
+                          <>Playing against: <span className="font-bold">{modelName || model}</span></>
+                        )}
                       </div>
                       {currentGameId && (
                         <button
@@ -727,7 +1066,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     isProcessing={isProcessing}
-                    disabled={!gameStarted || gameEnded}
+                    disabled={!gameStarted || gameEnded || gameType === 'ai_vs_ai'}
                     onNewGame={handleNewGame}
                   />
                 </div>

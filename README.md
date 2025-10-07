@@ -54,7 +54,7 @@ Create a `.env.local` file:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your-publishable-key
 USER_APIKEY_ENCRYPTION_KEY=your-32-byte-base64-encryption-key
 ```
 

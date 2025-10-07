@@ -6,17 +6,40 @@ import { decryptApiKey, EncryptedData } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, model, apiKey: clientApiKey, baseUrl: clientBaseUrl } = await request.json();
+    const { messages, model, apiKey: clientApiKey, baseUrl: clientBaseUrl, configId } = await request.json();
 
     let apiKey: string;
     let baseUrl: string | undefined;
+    let modelToUse: string = model || 'gpt-4o-mini';
 
     // Check if user is authenticated
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (user) {
-      // Authenticated user - load encrypted API key from database
+    if (configId && user) {
+      // Load specific AI configuration (for AI vs AI games)
+      const { data: configData, error: configError } = await supabase
+        .from('ai_configurations')
+        .select('key_encrypted, base_url, model_name')
+        .eq('id', configId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (configError || !configData) {
+        return new Response('AI configuration not found', { status: 400 });
+      }
+
+      // Decrypt API key server-side
+      try {
+        apiKey = decryptApiKey(configData.key_encrypted as EncryptedData);
+        baseUrl = configData.base_url || undefined;
+        modelToUse = configData.model_name;
+      } catch (error) {
+        console.error('Failed to decrypt API key:', error);
+        return new Response('Failed to decrypt API key', { status: 500 });
+      }
+    } else if (user) {
+      // Authenticated user - load default encrypted API key from database
       const { data: keyData, error: keyError } = await supabase
         .from('api_keys')
         .select('key_encrypted, base_url')
@@ -50,7 +73,7 @@ export async function POST(request: NextRequest) {
     });
 
     const response = await openai.chat.completions.create({
-      model: model || 'gpt-5-mini',
+      model: modelToUse,
       messages: messages,
       tools: TOOLS,
       stream: true,
